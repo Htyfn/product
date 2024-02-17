@@ -1,52 +1,52 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
 
-	"github.com/ilyakaznacheev/cleanenv"
+	"github.com/kelseyhightower/envconfig"
 )
 
 type Config struct {
-	Env        string     `yaml:"env" env-default:"develop"`
-	HTTPServer HTTPServer `yaml:"http_server"`
-	Storage    Storage    `yaml:"storage" env-required:"true"`
+	Env               string
+	ServerAddress     string
+	ServerTimeout     time.Duration
+	ServerIdleTimeout time.Duration
+	DBHost            string
+	DBPort            int
+	DBUser            string
+	DBPassword        string
+	DBName            string
 }
 
-type HTTPServer struct {
-	Address     string        `yaml:"address" env-default:"localhost:8080"`
-	Timeout     time.Duration `yaml:"timeout" env-default:"4s"`
-	IdleTimeout time.Duration `yaml:"idle_timeout" env-default:"60s"`
-}
-
-type Storage struct {
-	Host     string `yaml:"host" env-required:"true"`
-	Port     int    `yaml:"port" env-required:"true"`
-	User     string `yaml:"user" env-required:"true"`
-	Password string `yaml:"password" env-required:"true" env:"HTTP_SERVER_PASSWORD"`
-	DBName   string `yaml:"dbname" env-required:"true"`
+// временно
+func Setenv() {
+	os.Setenv("APP_ENV", "local")
+	os.Setenv("APP_SERVERADDRESS", "localhost:8081")
+	os.Setenv("APP_SERVERTIMEOUT", "4s")
+	os.Setenv("APP_SERVERIDLETIMEOUT", "60s")
+	os.Setenv("APP_DBHOST", "localhost")
+	os.Setenv("APP_DBPORT", "5432")
+	os.Setenv("APP_DBUSER", "postgres")
+	os.Setenv("APP_DBPASSWORD", "admin")
+	os.Setenv("APP_DBNAME", "postgres")
 }
 
 func MustLoad() Config {
 
-	configPath := os.Getenv("CONFIG_PATH")
+	Setenv()
 
-	if configPath == "" {
-		log.Fatal("CONFIG_PATH is not specified")
-	}
-
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		log.Fatal("config file does not exists: ", configPath)
-	}
-
-	var cfg Config
-
-	if err := cleanenv.ReadConfig(configPath, &cfg); err != nil {
+	cfg := Config{}
+	if err := envconfig.Process("APP", &cfg); err != nil {
 		log.Fatalf("cannot read config: %s", err)
 	}
 
+	os.Setenv("STORAGE_CONFIG",
+		fmt.Sprintf("host=%s port=%d user=%s "+
+			"password=%s dbname=%s sslmode=disable",
+			cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName))
+
 	return cfg
 }
-
-// github.com/ilyakaznacheev/cleanenv
