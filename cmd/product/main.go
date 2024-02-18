@@ -30,6 +30,20 @@ func main() {
 	defer storage.Close(st)
 	log.Debug("Successfully connected!")
 
+	if err = storage.Prepare(st); err != nil {
+		log.Error("failed to init storage", sl.Err(err))
+		os.Exit(1)
+	}
+	log.Debug("Prepearing DB completed")
+
+	productId, err := storage.SaveProduct(st, 1, 10, 643)
+
+	if err != nil {
+		log.Error("failed to insert rows", sl.Err(err))
+		os.Exit(1)
+	}
+	log.Debug("Successfully insertet into product", "productId", productId)
+
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 
