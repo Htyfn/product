@@ -35,7 +35,7 @@ func New(log *slog.Logger) (*Storage, error) {
 	return &Storage{db: db}, nil
 }
 
-// инициирует таблицы
+// инициализирует таблицы
 // TODO перенести в миграции
 func Prepare(storage *Storage) error {
 	const op = "storage.Prepare"
@@ -92,23 +92,22 @@ func Prepare(storage *Storage) error {
 	return nil
 }
 
-func Close(storage *Storage) {
-	storage.db.Close()
+func (s *Storage) Close() {
+	s.db.Close()
 }
 
 // returns productId
-func SaveProduct(storage *Storage, seller int64, price float32, curr int16) (int64, error) {
+//
+//	INSERT INTO product (seller, price, curr) VALUES (seller, price, curr) RETURNING id;
+func (s *Storage) SaveProduct(seller int, price float64, curr int16) (int, error) {
 	const op = "storage.SaveProduct"
 
-	//  INSERT INTO product (seller, price, curr) VALUES (seller, price, curr) RETURNING id;
-
-	stmt, err := storage.db.Prepare("INSERT INTO product (seller, price, curr) VALUES ($1, $2, $3) RETURNING id")
+	stmt, err := s.db.Prepare("INSERT INTO product (seller, price, curr) VALUES ($1, $2, $3) RETURNING id")
 	if err != nil {
 		return 0, fmt.Errorf("%s: prepare statement: %w", op, err)
 	}
 
-	var productId int64
-
+	var productId int
 	err = stmt.QueryRow(seller, price, curr).Scan(&productId)
 	if err != nil {
 		return 0, fmt.Errorf("%s: execute statement: %w", op, err)
@@ -117,9 +116,53 @@ func SaveProduct(storage *Storage, seller int64, price float32, curr int16) (int
 	return productId, nil
 }
 
-func SaveAttrStr(storage *Storage, productId int64, key string, value string) error {
+// тут бы обрезать value до 4000 знаков
+func (s *Storage) SaveAttrStr(productId int, key string, value string) error {
+	const op = "storage.SaveAttrStr"
 
-	//  INSERT INTO product (seller, price, curr) VALUES (seller, price, curr) RETURNING id;
-
+	_, err := s.db.Exec("INSERT INTO productAttrStr (productId, key, value) VALUES ($1, $2, $3)", productId, key, value)
+	if err != nil {
+		return fmt.Errorf("%s: execute statement: %w", op, err)
+	}
 	return nil
+}
+
+// returns seller, price, curr, err
+//
+//	select seller, price, curr from product where id = ?;
+func (s *Storage) GetProductById(id int) (int, float64, int16, error) {
+	const op = "storage.GetProductById"
+	var seller int
+	var price float64
+	var curr int16
+
+	stmt, err := s.db.Prepare("select seller, price::money::numeric, curr from product where id = $1 ")
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("%s: prepare statement: %w", op, err)
+	}
+
+	err = stmt.QueryRow(id).Scan(&seller, &price, &curr)
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("%s: execute statement: %w", op, err)
+	}
+
+	return seller, price, curr, nil
+}
+
+// TODO
+// returns sql.Rows (key, value)
+func (s *Storage) GetProductAttrStr(productId int) (*sql.Rows, error) {
+	const op = "storage.GetProductAttrStr"
+
+	stmt, err := s.db.Prepare("select key, value from productAttrStr where productId = $1 ")
+	if err != nil {
+		return nil, fmt.Errorf("%s: prepare statement: %w", op, err)
+	}
+
+	rows, err := stmt.Query(productId)
+	if err != nil {
+		return nil, fmt.Errorf("%s: execute statement: %w", op, err)
+	}
+
+	return rows, nil
 }

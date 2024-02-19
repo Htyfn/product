@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"os"
 	"product/internal/config"
+	"product/internal/generator"
+	"product/internal/product"
 	"product/internal/sl"
 	"product/internal/storage"
 
@@ -21,28 +23,33 @@ func main() {
 	log.Info("Starting app: 'Product'", slog.String("env", cfg.Env))
 	log.Debug("debug messages are enabled")
 
-	st, err := storage.New(log)
+	s, err := storage.New(log)
 
 	if err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
 	}
-	defer storage.Close(st)
+	defer s.Close()
 	log.Debug("Successfully connected!")
-
-	if err = storage.Prepare(st); err != nil {
+	//
+	if err = storage.Prepare(s); err != nil {
 		log.Error("failed to init storage", sl.Err(err))
 		os.Exit(1)
 	}
 	log.Debug("Prepearing DB completed")
 
-	productId, err := storage.SaveProduct(st, 1, 10, 643)
+	//
+	generator.Generate(log, s)
+
+	pr, err := product.GetProduct(7, log, s)
 
 	if err != nil {
-		log.Error("failed to insert rows", sl.Err(err))
 		os.Exit(1)
 	}
-	log.Debug("Successfully insertet into product", "productId", productId)
+	log.Debug("GetProduct", "pr.Id", pr.Id)
+	for _, attr := range pr.Attrs {
+		log.Debug("GetProduct", attr.Key, attr.Value)
+	}
 
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
