@@ -30,13 +30,6 @@ func main() {
 		os.Exit(1)
 	}
 	defer s.Close()
-	log.Debug("Successfully connected!")
-	//
-	if err = storage.Prepare(s); err != nil {
-		log.Error("failed to init storage", sl.Err(err))
-		os.Exit(1)
-	}
-	log.Debug("Prepearing DB completed")
 
 	//
 	generator.Generate(log, s)
